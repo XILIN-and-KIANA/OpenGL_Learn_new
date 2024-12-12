@@ -1,0 +1,177 @@
+//OPENGL Header
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+//CPP Header
+#include <iostream>
+
+// 顶点着色器：负责处理每个顶点的位置，并将其从模型空间转换到裁剪空间。
+// 输入：aPos（传入的顶点坐标，类型为vec3）
+// 输出：gl_Position（顶点在裁剪空间中的位置，类型为vec4）
+
+const char* vertexShaderSource = "#version 330 core\n"
+"layout (location = 0) in vec3 aPos;\n"
+"void main()\n"
+"{\n"
+"   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"   // 将输入的顶点位置（vec3）转换为四维坐标（vec4）
+"}\0";
+
+// 片段着色器：负责计算每个像素的最终颜色。
+// 输出：FragColor（每个片段的颜色，这里是一个固定的橙色）
+
+const char* fragmentShaderSource = "#version 330 core\n"
+"out vec4 FragColor;\n"   // 输出颜色
+"void main()\n"
+"{\n"
+"   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"   // 输出一个固定的橙色
+"}\n\0";
+
+
+//Window width and Window height
+const int screen_width = 800;
+const int screen_height = 600;
+
+void Frame_buffer_size_resize(GLFWwindow* window, GLsizei screen_width_view, GLsizei screen_height_view);
+void processInput(GLFWwindow* window);
+
+int main()
+{
+	//Init GLFW and Config
+	glfwInit();
+	//使用opengl 3.3 ， 并采用核心渲染模式。
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	//Create GLFW window
+	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "Learn OpenGL", NULL, NULL);
+	//判断窗口是否创建成功
+	if (!window)
+	{
+		std::cout << "Failed to create opengl window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+	//设置window窗口为当前上下文
+	glfwMakeContextCurrent(window);
+	//窗口重绘回调函数，当窗口发生改变时，调用该函数。
+	glfwSetFramebufferSizeCallback(window, Frame_buffer_size_resize);
+
+	//初始化GLAD并判断是否成功。
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return -1;
+	}
+
+	//创建顶点着色器
+	GLuint Vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(Vertex_shader, 1, &vertexShaderSource, NULL);
+	glCompileShader(Vertex_shader);
+	// check for shader compile errors
+	int success;
+	char infoLog[512];
+	glGetShaderiv(Vertex_shader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(Vertex_shader, 512, NULL, infoLog);
+		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+	//创建片元着色器
+	GLuint Fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(Fragment_shader, 1, &fragmentShaderSource, NULL);
+	glCompileShader(Fragment_shader);
+	// check for shader compile errors
+	glGetShaderiv(Fragment_shader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(Fragment_shader, 512, NULL, infoLog);
+		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+
+	//创建着色器程序
+	GLuint Shader_Program = glCreateProgram();
+	glAttachShader(Shader_Program, Vertex_shader);
+	glAttachShader(Shader_Program, Fragment_shader);
+	glLinkProgram(Shader_Program);
+
+	// check for linking errors
+	glGetProgramiv(Shader_Program, GL_LINK_STATUS, &success);
+	if (!success)
+	{
+		glGetProgramInfoLog(Shader_Program, 512, NULL, infoLog);
+		std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+	}
+	glDeleteShader(Vertex_shader);
+	glDeleteShader(Fragment_shader);
+
+	// 顶点数据
+	float vertices[] = {
+		// 位置             
+		-0.5f, - 0.5f, 0.0f,
+	   0.5f,  -0.5f, 0.0f,
+		0.0f, 0.5f, 0.0f,
+	};
+
+	//创建VBO，VAO
+	GLuint VBO, VAO;
+	//在显存中创建顶点缓冲区对象 与 顶点数组对象
+	//顶点缓冲区对象用来存放顶点数据,顶点数组对象用来描述如何使用这些顶点数据。
+	glGenBuffers(1, &VBO);
+	glGenVertexArrays(1, &VAO);
+
+	//VBO绑定
+	//GL_ARRAY_BUFFER类似于一个接口
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	//VAO绑定
+	glBindVertexArray(VAO);
+
+	
+
+	//将数据上传至VBO显存段中。
+	glBufferData(GL_ARRAY_BUFFER,sizeof(vertices),vertices,GL_STATIC_DRAW);
+
+	//描述顶点属性
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	// 解绑 VAO 和 VBO
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+
+	//主循环
+	while (!glfwWindowShouldClose(window))
+	{
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glUseProgram(Shader_Program);
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+	glDeleteVertexArrays(1, &VAO);
+	glDeleteBuffers(1, &VBO);
+	glDeleteProgram(Shader_Program);
+	glfwTerminate();
+	return 0;
+}
+
+
+void Frame_buffer_size_resize(GLFWwindow* window, GLsizei screen_width_view, GLsizei screen_height_view)
+{
+	glViewport(0, 0, screen_width_view, screen_height_view);
+	std::cout << "Resize : \n";
+	std::cout << "Current width : " << screen_width_view << "\n" << "Current height :" << screen_height_view << std::endl;
+}
+
+//INPUT AND OUTPUT
+void processInput(GLFWwindow* window)
+{
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+}
